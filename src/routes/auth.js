@@ -15,11 +15,21 @@ function isValidPhone(phone) {
   return /^1[3-9]\d{9}$/.test(phone);
 }
 
+// 苹果审核演示账号（固定验证码，跳过短信，用于 App Review & 内部测试）
+const DEMO_PHONE = '13900139000';
+const DEMO_CODE  = '999999';
+
 // POST /api/auth/send-code
 router.post('/send-code', async (req, res) => {
   const { phone } = req.body;
   if (!phone || !isValidPhone(phone)) {
     return res.status(400).json({ error: '手机号格式不正确' });
+  }
+
+  // 演示账号：跳过短信，直接返回 ok（审核员和测试用）
+  if (phone === DEMO_PHONE) {
+    console.log('[DEMO] 演示账号请求验证码，跳过短信');
+    return res.json({ ok: true });
   }
 
   const code = generateCode();
@@ -48,6 +58,19 @@ router.post('/login', async (req, res) => {
   }
   if (!code || !/^\d{6}$/.test(code)) {
     return res.status(400).json({ error: '验证码格式不正确' });
+  }
+
+  // 演示账号直通：跳过 store 验证，直接下发 token
+  if (phone === DEMO_PHONE && code === DEMO_CODE) {
+    console.log('[DEMO] 演示账号登录成功');
+    const expiresInSeconds = 90 * 24 * 60 * 60;
+    const token = jwt.sign(
+      { phone, iat: Math.floor(Date.now() / 1000) },
+      process.env.JWT_SECRET,
+      { expiresIn: expiresInSeconds }
+    );
+    const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+    return res.json({ token, expires_at: expiresAt, phone });
   }
 
   const result = await verifyCode(phone, code);
