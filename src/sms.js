@@ -6,17 +6,18 @@ const crypto = require('crypto');
 const querystring = require('querystring');
 
 /**
- * 阿里云「短信认证服务」· SendSmsVerifyCode
+ * 阿里云「号码认证服务」· SendSmsVerifyCode
  *
- * ✅ 无需申请签名
- * ✅ 无需申请模板
- * ✅ 个人开发者可用
- *
- * API：dytnsapi.aliyuncs.com
+ * API：dypnsapi.aliyuncs.com（注意：dypnsapi，不是 dytnsapi）
  * Action：SendSmsVerifyCode
  * Version：2017-05-25
  *
- * 文档：https://help.aliyun.com/zh/pni/developer-reference/api-dytnsapi-2017-05-25-sendsmsverifycode
+ * ⚠️ 签名（SignName）必须使用系统赠送签名，不支持自定义签名
+ * ⚠️ 模板（TemplateCode）必须使用系统赠送模板，搭配赠送签名使用
+ * 赠送签名配置：号码认证控制台 → 赠送签名配置
+ * 赠送模板配置：号码认证控制台 → 赠送模板配置
+ *
+ * 文档：https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode
  */
 
 const ACCESS_KEY_ID     = process.env.ALIYUN_ACCESS_KEY_ID;
@@ -47,12 +48,13 @@ async function sendSmsCode(phone, code) {
   const nonce     = crypto.randomBytes(8).toString('hex');
 
   const params = {
-    AccessKeyId:      ACCESS_KEY_ID,
-    Action:           'SendSmsVerifyCode',
-    Format:           'JSON',
-    PhoneNumber:      phone,
-    SmsTemplateCode:  process.env.ALIYUN_SMS_TEMPLATE_CODE,   // SMS_332960046
-    SmsTemplateParam: JSON.stringify({ code, min: '5' }),      // 我们自己指定验证码
+    AccessKeyId:    ACCESS_KEY_ID,
+    Action:         'SendSmsVerifyCode',
+    Format:         'JSON',
+    PhoneNumber:    phone,
+    SignName:       process.env.ALIYUN_SMS_SIGN_NAME,     // 系统赠送签名名称
+    TemplateCode:   process.env.ALIYUN_SMS_TEMPLATE_CODE, // 系统赠送模板 CODE
+    TemplateParam:  JSON.stringify({ code }),              // 验证码参数（模板只有 ${code} 占位符）
     SignatureMethod:  'HMAC-SHA1',
     SignatureNonce:   nonce,
     SignatureVersion: '1.0',
@@ -65,7 +67,7 @@ async function sendSmsCode(phone, code) {
   return new Promise((resolve, reject) => {
     const body    = querystring.stringify(params);
     const options = {
-      hostname: 'dytnsapi.aliyuncs.com',
+      hostname: 'dypnsapi.aliyuncs.com',
       method:   'POST',
       headers:  {
         'Content-Type':   'application/x-www-form-urlencoded',
@@ -80,6 +82,7 @@ async function sendSmsCode(phone, code) {
         try {
           const json = JSON.parse(data);
           console.log('[SMS Response]', JSON.stringify(json));
+          // SendSmsVerifyCode 成功时返回 Model.Code === 'OK'
           if (json.Code !== 'OK') {
             reject(new Error(`短信发送失败：${json.Message}（${json.Code}）`));
           } else {
