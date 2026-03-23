@@ -54,7 +54,7 @@ async function sendSmsCode(phone, code) {
     PhoneNumber:    phone,
     SignName:       process.env.ALIYUN_SMS_SIGN_NAME,     // 系统赠送签名名称
     TemplateCode:   process.env.ALIYUN_SMS_TEMPLATE_CODE, // 系统赠送模板 CODE
-    TemplateParam:  JSON.stringify({ code }),              // 验证码参数（模板只有 ${code} 占位符）
+    TemplateParam:  JSON.stringify({ code, min: '5' }),    // 模板：${code} + ${min}分钟有效
     SignatureMethod:  'HMAC-SHA1',
     SignatureNonce:   nonce,
     SignatureVersion: '1.0',
