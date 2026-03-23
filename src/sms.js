@@ -57,7 +57,7 @@ async function sendSmsCode(phone, code) {
     SignatureNonce:   nonce,
     SignatureVersion: '1.0',
     Timestamp:        timestamp,
-    Version:          '2017-05-25',
+    Version:          '2023-05-16',
   };
 
   params.Signature = sign(params, ACCESS_KEY_SECRET);
