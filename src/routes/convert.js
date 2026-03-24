@@ -2,10 +2,8 @@
 
 /**
  * /api/convert 路由
- * POST /api/convert/images-to-pptx  接收多张图片 → 返回 PPTX 下载
+ * POST /api/convert/images-to-pptx  接收多张图片 → 返回 PDF 下载（原名保留兼容iOS端）
  * POST /api/convert/pdf-to-word      接收 PDF    → 返回 DOCX 下载
- *
- * 图片以 base64 JSON 上传，避免 multer 依赖
  */
 
 const express = require('express');
@@ -13,7 +11,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { imagesToPptx, pdfToWord } = require('../ilovepdf');
+const { imagesToPdf, pdfToWord } = require('../ilovepdf');
 
 // ─── 工具：base64 → 临时文件 ─────────────────────────────
 function base64ToTmp(base64, ext) {
@@ -32,7 +30,7 @@ router.post('/images-to-pptx', async (req, res) => {
   }
 
   const tmpImages = [];
-  const outputPath = path.join(os.tmpdir(), `ppt_${Date.now()}.pptx`);
+  const outputPath = path.join(os.tmpdir(), `pdf_${Date.now()}.pdf`);
 
   try {
     // base64 → 临时 jpg 文件
@@ -40,12 +38,11 @@ router.post('/images-to-pptx', async (req, res) => {
       tmpImages.push(base64ToTmp(b64, 'jpg'));
     }
 
-    console.log(`[convert] images-to-pptx 开始，共 ${images.length} 张图片`);
-    await imagesToPptx(tmpImages, outputPath);
-    console.log(`[convert] images-to-pptx 完成：${outputPath}`);
+    console.log(`[convert] images-to-pdf 开始，共 ${images.length} 张图片`);
+    await imagesToPdf(tmpImages, outputPath);
+    console.log(`[convert] images-to-pdf 完成：${outputPath}`);
 
-    // 下载后删除临时文件
-    res.download(outputPath, 'presentation.pptx', err => {
+    res.download(outputPath, 'document.pdf', err => {
       if (err) console.error('[convert] 下载失败', err);
       fs.unlinkSync(outputPath);
     });

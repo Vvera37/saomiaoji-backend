@@ -132,30 +132,18 @@ async function downloadResult(token, server, taskId, outputPath) {
   return outputPath;
 }
 
-// ─── 主流程：图片数组 → PPTX 文件 ───────────────────────
-async function imagesToPptx(imagePaths, outputPath) {
+// ─── 主流程：图片数组 → PDF 文件 ────────────────────────
+// 注：iLovePDF 只支持 imagepdf（图片转PDF），不支持直接转PPT，PPT功能后续处理
+async function imagesToPdf(imagePaths, outputPath) {
   const token = await getToken();
-
-  // 1. 图片 → PDF
-  const { server: s1, taskId: t1 } = await createTask(token, 'imagepdf');
-  const sfNames1 = [];
+  const { server, taskId } = await createTask(token, 'imagepdf');
   for (let i = 0; i < imagePaths.length; i++) {
-    const sf = await uploadFile(token, s1, t1, imagePaths[i], `page_${i + 1}.jpg`);
-    sfNames1.push(sf);
+    await uploadFile(token, server, taskId, imagePaths[i], `page_${i + 1}.jpg`);
   }
-  const pdfFilename = await processTask(token, s1, t1, 'imagepdf', sfNames1);
-  const tmpPdf = outputPath.replace(/\.pptx$/, '_tmp.pdf');
-  await downloadResult(token, s1, t1, tmpPdf);
-
-  // 2. PDF → PPTX
-  const token2 = await getToken(); // 重新获取 token
-  const { server: s2, taskId: t2 } = await createTask(token2, 'pdftopresentaion');
-  const sf2 = await uploadFile(token2, s2, t2, tmpPdf, 'document.pdf');
-  await processTask(token2, s2, t2, 'pdftopresentaion', [sf2]);
-  await downloadResult(token2, s2, t2, outputPath);
-
-  // 清理临时 PDF
-  fs.unlinkSync(tmpPdf);
+  await processTask(token, server, taskId, 'imagepdf',
+    imagePaths.map((_, i) => ({ server_filename: `page_${i + 1}.jpg`, filename: `page_${i + 1}.jpg` }))
+  );
+  await downloadResult(token, server, taskId, outputPath);
   return outputPath;
 }
 
