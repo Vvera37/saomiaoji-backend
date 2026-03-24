@@ -157,4 +157,4 @@ async function pdfToWord(pdfPath, outputPath) {
   return outputPath;
 }
 
-module.exports = { imagesToPptx, pdfToWord };
+module.exports = { imagesToPdf, pdfToWord };
