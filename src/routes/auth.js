@@ -19,6 +19,9 @@ function isValidPhone(phone) {
 const DEMO_PHONE = '13900139000';
 const DEMO_CODE  = '999999';
 
+// 短信发送冷却（内存级，重启重置；Sealos 单实例够用）
+const smsCooldown = new Map(); // phone → timestamp
+
 // POST /api/auth/send-code
 router.post('/send-code', async (req, res) => {
   const { phone } = req.body;
@@ -32,6 +35,13 @@ router.post('/send-code', async (req, res) => {
     return res.json({ ok: true });
   }
 
+  // 60 秒冷却，防止阿里云限流返回 UNKNOWN
+  const lastSent = smsCooldown.get(phone);
+  if (lastSent && Date.now() - lastSent < 60_000) {
+    const remaining = Math.ceil((60_000 - (Date.now() - lastSent)) / 1000);
+    return res.status(429).json({ error: `发送太频繁，请 ${remaining} 秒后重试` });
+  }
+
   const code = generateCode();
 
   try {
@@ -42,6 +52,7 @@ router.post('/send-code', async (req, res) => {
     }
 
     await sendSmsCode(phone, code);
+    smsCooldown.set(phone, Date.now()); // 发送成功才记录冷却
     await saveCode(phone, code);
     res.json({ ok: true });
   } catch (err) {
