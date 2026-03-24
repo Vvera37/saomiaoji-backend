@@ -149,9 +149,9 @@ async function imagesToPptx(imagePaths, outputPath) {
 
   // 2. PDF → PPTX
   const token2 = await getToken(); // 重新获取 token
-  const { server: s2, taskId: t2 } = await createTask(token2, 'pdftopowerpoint');
+  const { server: s2, taskId: t2 } = await createTask(token2, 'pdfpptx');
   const sf2 = await uploadFile(token2, s2, t2, tmpPdf, 'document.pdf');
-  await processTask(token2, s2, t2, 'pdftopowerpoint', [sf2]);
+  await processTask(token2, s2, t2, 'pdfpptx', [sf2]);
   await downloadResult(token2, s2, t2, outputPath);
 
   // 清理临时 PDF
