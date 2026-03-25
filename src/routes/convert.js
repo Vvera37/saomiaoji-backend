@@ -3,7 +3,7 @@
 /**
  * /api/convert 路由
  * POST /api/convert/images-to-pptx  接收多张图片 → 返回 PDF（用 pdf-lib 合并，无水印）
- * POST /api/convert/pdf-to-word      接收 PDF    → 返回 DOCX（iLovePDF）
+ * POST /api/convert/pdf-to-word      接收 PDF    → 返回 DOCX（Cloudmersive API）
  */
 
 const express = require('express');
@@ -11,8 +11,56 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const https = require('https');
 const { PDFDocument } = require('pdf-lib');
-const { pdfToWord } = require('../ilovepdf');
+
+// ─── Cloudmersive PDF → DOCX ──────────────────────────────
+const CLOUDMERSIVE_API_KEY = process.env.CLOUDMERSIVE_API_KEY || '1b8cac71-9e46-47af-821f-1ef1a8329c97';
+
+/**
+ * 调用 Cloudmersive /convert/pdf/to/docx
+ * pdfBuffer: Buffer
+ * 返回: Buffer (docx)
+ */
+function cloudmersivePdfToDocx(pdfBuffer) {
+  return new Promise((resolve, reject) => {
+    const boundary = 'Boundary-' + Date.now();
+    const CRLF = '\r\n';
+
+    const header = Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="inputFile"; filename="scan_result.pdf"${CRLF}` +
+      `Content-Type: application/pdf${CRLF}${CRLF}`
+    );
+    const footer = Buffer.from(`${CRLF}--${boundary}--${CRLF}`);
+    const body = Buffer.concat([header, pdfBuffer, footer]);
+
+    const options = {
+      hostname: 'api.cloudmersive.com',
+      path: '/convert/pdf/to/docx',
+      method: 'POST',
+      headers: {
+        'Apikey': CLOUDMERSIVE_API_KEY,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length
+      }
+    };
+
+    const req = https.request(options, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Cloudmersive 响应 ${res.statusCode}: ${Buffer.concat(chunks).toString().slice(0, 200)}`));
+        }
+        resolve(Buffer.concat(chunks));
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 // ─── 工具：base64 → Buffer ────────────────────────────────
 function base64ToBuffer(base64) {
@@ -80,12 +128,13 @@ router.post('/pdf-to-word', async (req, res) => {
   const { pdf } = req.body;
   if (!pdf) return res.status(400).json({ error: '请提供 pdf base64 字符串' });
 
-  const tmpPdf = base64ToTmp(pdf, 'pdf');
-  const outputPath = path.join(os.tmpdir(), `word_${Date.now()}.docx`);
-
   try {
-    console.log('[convert] pdf-to-word 开始');
-    await pdfToWord(tmpPdf, outputPath);
+    console.log('[convert] pdf-to-word 开始（Cloudmersive）');
+    const pdfBuffer = base64ToBuffer(pdf);
+    const docxBuffer = await cloudmersivePdfToDocx(pdfBuffer);
+
+    const outputPath = path.join(os.tmpdir(), `word_${Date.now()}.docx`);
+    fs.writeFileSync(outputPath, docxBuffer);
     console.log('[convert] pdf-to-word 完成');
 
     res.download(outputPath, 'document.docx', err => {
@@ -95,8 +144,6 @@ router.post('/pdf-to-word', async (req, res) => {
   } catch (err) {
     console.error('[convert] pdf-to-word 失败:', err.message);
     res.status(500).json({ error: '转换失败：' + err.message });
-  } finally {
-    try { fs.unlinkSync(tmpPdf); } catch {}
   }
 });
 
