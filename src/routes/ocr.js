@@ -22,7 +22,7 @@ function claudeOCR(imageBase64) {
     }
 
     const bodyObj = {
-      model: 'anthropic/claude-sonnet-4.5',
+      model: 'anthropic/claude-sonnet-4.6',
       max_tokens: 4096,
       messages: [
         {
