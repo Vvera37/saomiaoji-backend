@@ -2,38 +2,36 @@
 
 /**
  * /api/ocr 路由
- * POST /api/ocr/handwriting  接收图片 base64 → 调用 Claude Vision → 返回识别文字
+ * POST /api/ocr/handwriting  接收图片 base64 → 调用 OpenRouter Claude Vision → 返回识别文字
  */
 
 const express = require('express');
 const router = express.Router();
 const https = require('https');
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 /**
- * 调用 Claude claude-opus-4-5 Vision 识别图片文字
+ * 调用 OpenRouter Claude Vision 识别图片文字
  * imageBase64: string (jpeg base64, 不含 data:image 前缀)
  */
 function claudeOCR(imageBase64) {
   return new Promise((resolve, reject) => {
-    if (!ANTHROPIC_API_KEY) {
-      return reject(new Error('未配置 ANTHROPIC_API_KEY'));
+    if (!OPENROUTER_API_KEY) {
+      return reject(new Error('未配置 OPENROUTER_API_KEY'));
     }
 
     const bodyObj = {
-      model: 'claude-opus-4-5',
+      model: 'anthropic/claude-sonnet-4-5',
       max_tokens: 4096,
       messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: imageBase64
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`
               }
             },
             {
@@ -48,14 +46,15 @@ function claudeOCR(imageBase64) {
     const body = JSON.stringify(bodyObj);
 
     const options = {
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
+      hostname: 'openrouter.ai',
+      path: '/api/v1/chat/completions',
       method: 'POST',
       headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'content-length': Buffer.byteLength(body)
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'HTTP-Referer': 'https://saomiaoji.app',
+        'X-Title': '扫描鸡'
       }
     };
 
@@ -67,12 +66,12 @@ function claudeOCR(imageBase64) {
         try {
           const json = JSON.parse(raw);
           if (json.error) {
-            return reject(new Error(`Claude 错误: ${json.error.message || JSON.stringify(json.error)}`));
+            return reject(new Error(`OpenRouter 错误: ${json.error.message || JSON.stringify(json.error)}`));
           }
-          const text = json.content?.[0]?.text ?? '';
+          const text = json.choices?.[0]?.message?.content ?? '';
           resolve(text);
         } catch (e) {
-          reject(new Error('Claude 响应解析失败: ' + raw.slice(0, 200)));
+          reject(new Error('响应解析失败: ' + raw.slice(0, 200)));
         }
       });
     });
