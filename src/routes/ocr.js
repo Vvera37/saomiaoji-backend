@@ -54,7 +54,7 @@ function claudeOCR(imageBase64) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
         'HTTP-Referer': 'https://saomiaoji.app',
-        'X-Title': '扫描鸡'
+        'X-Title': 'SpeedScan'
       }
     };
 
