@@ -22,7 +22,7 @@ function claudeOCR(imageBase64) {
     }
 
     const bodyObj = {
-      model: 'anthropic/claude-sonnet-4-5',
+      model: 'anthropic/claude-sonnet-4.5',
       max_tokens: 4096,
       messages: [
         {
@@ -66,11 +66,14 @@ function claudeOCR(imageBase64) {
         try {
           const json = JSON.parse(raw);
           if (json.error) {
+            // 打印完整错误，方便排查
+            console.error('[ocr] OpenRouter 完整错误:', JSON.stringify(json.error));
             return reject(new Error(`OpenRouter 错误: ${json.error.message || JSON.stringify(json.error)}`));
           }
           const text = json.choices?.[0]?.message?.content ?? '';
           resolve(text);
         } catch (e) {
+          console.error('[ocr] 原始响应:', raw.slice(0, 500));
           reject(new Error('响应解析失败: ' + raw.slice(0, 200)));
         }
       });
