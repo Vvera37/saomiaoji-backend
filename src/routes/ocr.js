@@ -1,0 +1,102 @@
+'use strict';
+
+/**
+ * /api/ocr 路由
+ * POST /api/ocr/handwriting  接收图片 base64 → 调用 Claude Vision → 返回识别文字
+ */
+
+const express = require('express');
+const router = express.Router();
+const https = require('https');
+
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+/**
+ * 调用 Claude claude-opus-4-5 Vision 识别图片文字
+ * imageBase64: string (jpeg base64, 不含 data:image 前缀)
+ */
+function claudeOCR(imageBase64) {
+  return new Promise((resolve, reject) => {
+    if (!ANTHROPIC_API_KEY) {
+      return reject(new Error('未配置 ANTHROPIC_API_KEY'));
+    }
+
+    const bodyObj = {
+      model: 'claude-opus-4-5',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: imageBase64
+              }
+            },
+            {
+              type: 'text',
+              text: '请识别图片中的所有文字内容，包括印刷体和手写体。要求：\n1. 完整保留原文，不要添加任何解释或注释\n2. 保持原有换行和段落结构\n3. 如有多列，从左到右、从上到下按阅读顺序输出\n4. 只输出识别到的文字，不要输出任何其他内容'
+            }
+          ]
+        }
+      ]
+    };
+
+    const body = JSON.stringify(bodyObj);
+
+    const options = {
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(body)
+      }
+    };
+
+    const req = https.request(options, res => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString();
+        try {
+          const json = JSON.parse(raw);
+          if (json.error) {
+            return reject(new Error(`Claude 错误: ${json.error.message || JSON.stringify(json.error)}`));
+          }
+          const text = json.content?.[0]?.text ?? '';
+          resolve(text);
+        } catch (e) {
+          reject(new Error('Claude 响应解析失败: ' + raw.slice(0, 200)));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// POST /api/ocr/handwriting
+// Body: { image: "base64 jpeg string" }
+router.post('/handwriting', async (req, res) => {
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ error: '请提供图片 base64 字符串 image' });
+
+  try {
+    console.log('[ocr] handwriting 识别开始');
+    const text = await claudeOCR(image);
+    console.log(`[ocr] handwriting 识别完成，字符数: ${text.length}`);
+    res.json({ text });
+  } catch (err) {
+    console.error('[ocr] handwriting 失败:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

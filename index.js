@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./src/routes/auth');
 const convertRoutes = require('./src/routes/convert');
+const ocrRoutes = require('./src/routes/ocr');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,7 @@ app.get('/health', (req, res) => {
 // 路由
 app.use('/api/auth', authRoutes);
 app.use('/api/convert', convertRoutes);
+app.use('/api/ocr', ocrRoutes);
 
 // 404
 app.use((req, res) => {
