@@ -6,6 +6,7 @@ const cors = require('cors');
 const authRoutes = require('./src/routes/auth');
 const convertRoutes = require('./src/routes/convert');
 const ocrRoutes = require('./src/routes/ocr');
+const { router: usageRoutes } = require('./src/routes/usage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +25,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/convert', convertRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/usage', usageRoutes);
 
 // 404
 app.use((req, res) => {

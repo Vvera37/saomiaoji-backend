@@ -13,6 +13,8 @@ const path = require('path');
 const os = require('os');
 const https = require('https');
 const { PDFDocument } = require('pdf-lib');
+const { getDb } = require('../db');
+const { checkQuota, recordUsage, getUserId } = require('./usage');
 
 // ─── Cloudmersive PDF → DOCX ──────────────────────────────
 const CLOUDMERSIVE_API_KEY = process.env.CLOUDMERSIVE_API_KEY || '1b8cac71-9e46-47af-821f-1ef1a8329c97';
@@ -83,7 +85,23 @@ router.post('/images-to-pptx', async (req, res) => {
     return res.status(400).json({ error: '请提供图片数组 images[]' });
   }
 
+  // ── 使用量卡控 ──
+  const user = getUserId(req);
+  if (!user) return res.status(400).json({ error: '缺少用户标识（需要登录或提供 X-Device-UUID）' });
+
   try {
+    const db = await getDb();
+    const quota = await checkQuota(db, user.id, 'images_pdf');
+    if (!quota.allowed) {
+      return res.status(402).json({
+        error: 'quota_exceeded',
+        feature: 'images_pdf',
+        used: quota.used,
+        limit: quota.limit,
+        message: '已超过免费次数，请购买VIP后继续使用',
+      });
+    }
+
     console.log(`[convert] images-to-pdf 开始，共 ${images.length} 张图片`);
 
     const pdfDoc = await PDFDocument.create();
@@ -112,6 +130,9 @@ router.post('/images-to-pptx', async (req, res) => {
 
     console.log(`[convert] images-to-pdf 完成：${outputPath}`);
 
+    // 转换成功后记录使用量
+    await recordUsage(db, user.id, 'images_pdf');
+
     res.download(outputPath, 'document.pdf', err => {
       if (err) console.error('[convert] 下载失败', err);
       try { fs.unlinkSync(outputPath); } catch {}
@@ -128,7 +149,23 @@ router.post('/pdf-to-word', async (req, res) => {
   const { pdf } = req.body;
   if (!pdf) return res.status(400).json({ error: '请提供 pdf base64 字符串' });
 
+  // ── 使用量卡控 ──
+  const user = getUserId(req);
+  if (!user) return res.status(400).json({ error: '缺少用户标识（需要登录或提供 X-Device-UUID）' });
+
   try {
+    const db = await getDb();
+    const quota = await checkQuota(db, user.id, 'pdf_word');
+    if (!quota.allowed) {
+      return res.status(402).json({
+        error: 'quota_exceeded',
+        feature: 'pdf_word',
+        used: quota.used,
+        limit: quota.limit,
+        message: '已超过免费次数，请购买VIP后继续使用',
+      });
+    }
+
     console.log('[convert] pdf-to-word 开始（Cloudmersive）');
     const pdfBuffer = base64ToBuffer(pdf);
     const docxBuffer = await cloudmersivePdfToDocx(pdfBuffer);
@@ -136,6 +173,9 @@ router.post('/pdf-to-word', async (req, res) => {
     const outputPath = path.join(os.tmpdir(), `word_${Date.now()}.docx`);
     fs.writeFileSync(outputPath, docxBuffer);
     console.log('[convert] pdf-to-word 完成');
+
+    // 转换成功后记录使用量
+    await recordUsage(db, user.id, 'pdf_word');
 
     res.download(outputPath, 'document.docx', err => {
       if (err) console.error('[convert] 下载失败', err);

@@ -4,6 +4,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { sendSmsCode } = require('../sms');
 const { saveCode, verifyCode } = require('../store');
+const { mergeUsage } = require('./usage');
 
 const router = express.Router();
 
@@ -81,6 +82,17 @@ router.post('/login', async (req, res) => {
       { expiresIn: expiresInSeconds }
     );
     const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+    // 合并 UUID 使用量（如果有传）
+    const uuid = req.headers['x-device-uuid'];
+    if (uuid) {
+      try {
+        const { getDb } = require('../db');
+        const db = await getDb();
+        await mergeUsage(db, uuid, phone);
+      } catch (e) {
+        console.error('[auth] UUID 合并失败（不阻断登录）:', e.message);
+      }
+    }
     return res.json({ token, expires_at: expiresAt, phone });
   }
 
@@ -102,6 +114,19 @@ router.post('/login', async (req, res) => {
     { expiresIn: expiresInSeconds }
   );
   const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+
+  // 合并 UUID 使用量（如果有传）
+  const uuid = req.headers['x-device-uuid'];
+  if (uuid) {
+    try {
+      const { getDb } = require('../db');
+      const db = await getDb();
+      await mergeUsage(db, uuid, phone);
+    } catch (e) {
+      console.error('[auth] UUID 合并失败（不阻断登录）:', e.message);
+    }
+  }
+
   res.json({ token, expires_at: expiresAt, phone });
 });
 

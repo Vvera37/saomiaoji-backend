@@ -8,6 +8,8 @@
 const express = require('express');
 const router = express.Router();
 const https = require('https');
+const { getDb } = require('../db');
+const { checkQuota, recordUsage, getUserId } = require('./usage');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -90,10 +92,30 @@ router.post('/handwriting', async (req, res) => {
   const { image } = req.body;
   if (!image) return res.status(400).json({ error: '请提供图片 base64 字符串 image' });
 
+  // ── 使用量卡控 ──
+  const user = getUserId(req);
+  if (!user) return res.status(400).json({ error: '缺少用户标识（需要登录或提供 X-Device-UUID）' });
+
   try {
+    const db = await getDb();
+    const quota = await checkQuota(db, user.id, 'ocr');
+    if (!quota.allowed) {
+      return res.status(402).json({
+        error: 'quota_exceeded',
+        feature: 'ocr',
+        used: quota.used,
+        limit: quota.limit,
+        message: '已超过免费次数，AI识别费用较高，请购买VIP后继续使用',
+      });
+    }
+
     console.log('[ocr] handwriting 识别开始');
     const text = await claudeOCR(image);
     console.log(`[ocr] handwriting 识别完成，字符数: ${text.length}`);
+
+    // 识别成功后记录使用量
+    await recordUsage(db, user.id, 'ocr');
+
     res.json({ text });
   } catch (err) {
     console.error('[ocr] handwriting 失败:', err.message);
