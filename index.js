@@ -7,6 +7,7 @@ const authRoutes = require('./src/routes/auth');
 const convertRoutes = require('./src/routes/convert');
 const ocrRoutes = require('./src/routes/ocr');
 const { router: usageRoutes } = require('./src/routes/usage');
+const subscriptionRoutes = require('./src/routes/subscription');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/convert', convertRoutes);
 app.use('/api/ocr', ocrRoutes);
 app.use('/api/usage', usageRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // 404
 app.use((req, res) => {
