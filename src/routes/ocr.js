@@ -11,20 +11,20 @@ const https = require('https');
 const { getDb } = require('../db');
 const { checkQuota, recordUsage, getUserId } = require('./usage');
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const MODELVERSE_API_KEY = process.env.MODELVERSE_API_KEY;
 
 /**
- * 调用 OpenRouter Claude Vision 识别图片文字
+ * 调用 Modelverse Claude Vision 识别图片文字
  * imageBase64: string (jpeg base64, 不含 data:image 前缀)
  */
 function claudeOCR(imageBase64) {
   return new Promise((resolve, reject) => {
-    if (!OPENROUTER_API_KEY) {
-      return reject(new Error('未配置 OPENROUTER_API_KEY'));
+    if (!MODELVERSE_API_KEY) {
+      return reject(new Error('未配置 MODELVERSE_API_KEY'));
     }
 
     const bodyObj = {
-      model: 'anthropic/claude-sonnet-4.6',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       messages: [
         {
@@ -48,15 +48,13 @@ function claudeOCR(imageBase64) {
     const body = JSON.stringify(bodyObj);
 
     const options = {
-      hostname: 'openrouter.ai',
-      path: '/api/v1/chat/completions',
+      hostname: 'api.modelverse.cn',
+      path: '/v1/chat/completions',
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${MODELVERSE_API_KEY}`,
         'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-        'HTTP-Referer': 'https://saomiaoji.app',
-        'X-Title': 'SpeedScan'
+        'Content-Length': Buffer.byteLength(body)
       }
     };
 
@@ -68,9 +66,8 @@ function claudeOCR(imageBase64) {
         try {
           const json = JSON.parse(raw);
           if (json.error) {
-            // 打印完整错误，方便排查
-            console.error('[ocr] OpenRouter 完整错误:', JSON.stringify(json.error));
-            return reject(new Error(`OpenRouter 错误: ${json.error.message || JSON.stringify(json.error)}`));
+            console.error('[ocr] Modelverse 完整错误:', JSON.stringify(json.error));
+            return reject(new Error(`Modelverse 错误: ${json.error.message || JSON.stringify(json.error)}`));
           }
           const text = json.choices?.[0]?.message?.content ?? '';
           resolve(text);
