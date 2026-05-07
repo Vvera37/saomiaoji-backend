@@ -78,6 +78,9 @@ function claudeOCR(imageBase64) {
       });
     });
     req.on('error', reject);
+    req.setTimeout(50000, () => {
+      req.destroy(new Error('Modelverse 请求超时（50s）'));
+    });
     req.write(body);
     req.end();
   });
