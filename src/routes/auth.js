@@ -127,7 +127,18 @@ router.post('/login', async (req, res) => {
     }
   }
 
-  res.json({ token, expires_at: expiresAt, phone });
+  // 查永久会员白名单
+  let isPermanentVip = false;
+  try {
+    const { getDb } = require('../db');
+    const db = await getDb();
+    const vipDoc = await db.collection('vip_users').findOne({ userId: phone, permanent: true });
+    if (vipDoc) isPermanentVip = true;
+  } catch (e) {
+    console.error('[auth] 查永久会员失败（不阻断登录）:', e.message);
+  }
+
+  res.json({ token, expires_at: expiresAt, phone, is_permanent_vip: isPermanentVip });
 });
 
 // POST /api/auth/refresh
